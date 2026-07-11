@@ -1,0 +1,3 @@
+"""
+SupportAI application package.
+"""
