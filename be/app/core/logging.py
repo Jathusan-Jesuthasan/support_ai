@@ -12,6 +12,14 @@ user_id_context: contextvars.ContextVar[Any] = contextvars.ContextVar("user_id",
 company_id_context: contextvars.ContextVar[Any] = contextvars.ContextVar("company_id", default=None)
 
 
+# Standard LogRecord attributes that should not be extracted as custom extra fields
+RESERVED_ATTRS = {
+    "name", "msg", "args", "levelname", "levelno", "pathname", "filename",
+    "module", "exc_info", "exc_text", "stack_info", "lineno", "funcName",
+    "created", "msecs", "relativeCreated", "thread", "threadName",
+    "processName", "process", "taskName", "message", "asctime"
+}
+
 
 class JSONFormatter(logging.Formatter):
     """
@@ -46,12 +54,17 @@ class JSONFormatter(logging.Formatter):
             log_payload["company_id"] = company_id
 
         # Safely extract extra variables attached during logging
+        for key, value in record.__dict__.items():
+            if key not in RESERVED_ATTRS and key not in log_payload:
+                log_payload[key] = value
+
         if hasattr(record, "extra") and isinstance(record.extra, dict):
             for key, value in record.extra.items():
                 if key not in log_payload:
                     log_payload[key] = value
 
         return json.dumps(log_payload)
+
 
 
 def setup_logging() -> None:

@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 from fastapi import Depends, Request
 # pyrefly: ignore [missing-import]
@@ -100,25 +100,89 @@ class PermissionChecker:
         """
         company_id_str = request.headers.get("X-Company-ID")
         if not company_id_str:
+            # Check path parameters as fallback
+            company_id_str = request.path_params.get("company_id")
+
+        if not company_id_str:
             raise AuthorizationException(
                 "Header X-Company-ID is required for workspace operations"
             )
 
         try:
-            company_id = UUID(company_id_str)
+            company_id = UUID(str(company_id_str))
         except ValueError:
             raise AuthorizationException("Invalid workspace ID format")
 
-        # TODO: Query the company_members collection using the database reference to verify:
-        # 1. User has an active membership: company_members.status == MembershipStatus.ACTIVE
-        # 2. User's role matches: company_members.role IN self.allowed_roles
-        # 3. Soft-delete check: company_members.is_deleted == False
+        member_data = await db["company_members"].find_one({
+            "user_id": user_id,
+            "company_id": company_id,
+            "is_deleted": False,
+            "status": MembershipStatus.ACTIVE.value,
+        })
+        if not member_data:
+            raise AuthorizationException("You do not have active membership in this company")
 
-        # Temporary mock context representing a valid membership resolver
+        role_val = member_data.get("role")
+        if isinstance(role_val, MembershipRole):
+            role_val = role_val.value
+
+        allowed_vals = [r.value if isinstance(r, MembershipRole) else r for r in self.allowed_roles]
+        if role_val not in allowed_vals:
+            raise AuthorizationException("Insufficient permissions for this workspace operation")
+
         return {
             "user_id": user_id,
             "company_id": company_id,
-            "role": MembershipRole.ADMIN,
+            "role": MembershipRole(role_val),
             "status": MembershipStatus.ACTIVE,
         }
+
+
+async def get_current_membership(
+    request: Request,
+    user_id: UUID = Depends(get_current_user_id),
+    db: AsyncIOMotorDatabase = Depends(get_db)
+) -> dict:
+    """
+    FastAPI dependency yielding the active membership document of the caller.
+    """
+    company_id_str = request.headers.get("X-Company-ID") or request.path_params.get("company_id")
+    if not company_id_str:
+        raise AuthorizationException("Header X-Company-ID is required for workspace operations")
+    try:
+        company_id = UUID(str(company_id_str))
+    except ValueError:
+        raise AuthorizationException("Invalid workspace ID format")
+
+    member_data = await db["company_members"].find_one({
+        "user_id": user_id,
+        "company_id": company_id,
+        "is_deleted": False,
+        "status": MembershipStatus.ACTIVE.value
+    })
+    if not member_data:
+        raise AuthorizationException("You do not have active membership in this company")
+    return member_data
+
+
+def require_company_access(allowed_roles: Optional[List[MembershipRole]] = None) -> PermissionChecker:
+    """
+    Helper dependency to require company access with any role by default, or specific roles.
+    """
+    if allowed_roles is None:
+        allowed_roles = [
+            MembershipRole.OWNER,
+            MembershipRole.ADMIN,
+            MembershipRole.MEMBER,
+            MembershipRole.VIEWER
+        ]
+    return PermissionChecker(allowed_roles)
+
+
+def require_roles(roles: List[MembershipRole]) -> PermissionChecker:
+    """
+    Helper dependency restricting workspace routes to whitelisted roles.
+    """
+    return PermissionChecker(roles)
+
 

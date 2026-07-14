@@ -1,10 +1,15 @@
 from typing import Dict
 from fastapi import APIRouter
 from app.auth.router import router as auth_router
+from app.company.router import router as company_router
+from app.membership.router import router as membership_router
+from app.knowledge.router import router as knowledge_router
+from app.chat.router import router as chat_router, ws_router as chat_ws_router
+from app.widget.router import admin_router as widget_admin_router, public_router as widget_public_router
+from app.analytics.router import router as analytics_router
 
 # Initialize the centralized V1 router
 api_router = APIRouter()
-
 
 
 # =====================================================================
@@ -37,19 +42,16 @@ async def read_health() -> Dict[str, str]:
 # Once the corresponding feature directories and router modules are
 # implemented in future sprints, uncomment these registrations.
 
-# from app.company.router import router as company_router
-
-# from app.membership.router import router as membership_router
-# from app.knowledge.router import router as knowledge_router
 # from app.chat.router import router as chat_router
 # from app.widget.router import router as widget_router
 # from app.analytics.router import router as analytics_router
 
 api_router.include_router(auth_router, prefix="/auth", tags=["Authentication"])
-# api_router.include_router(company_router, prefix="/company", tags=["Companies"])
-# api_router.include_router(membership_router, prefix="/membership", tags=["Memberships"])
-# api_router.include_router(knowledge_router, prefix="/knowledge", tags=["Knowledge Base"])
-# api_router.include_router(chat_router, prefix="/chat", tags=["Conversations"])
-# api_router.include_router(widget_router, prefix="/widget", tags=["Widget Settings"])
-# api_router.include_router(analytics_router, prefix="/analytics", tags=["Analytics"])
-
+api_router.include_router(company_router, prefix="/companies", tags=["Companies"])
+api_router.include_router(membership_router, prefix="/membership", tags=["Memberships"])
+api_router.include_router(knowledge_router, prefix="/companies/{company_id}/knowledge", tags=["Knowledge Base"])
+api_router.include_router(chat_router, prefix="/companies/{company_id}", tags=["Conversations"])
+api_router.include_router(chat_ws_router, prefix="/chat", tags=["Conversations (WebSockets)"])
+api_router.include_router(widget_admin_router, prefix="/companies/{company_id}", tags=["Widget Settings"])
+api_router.include_router(widget_public_router, prefix="/widget", tags=["Widget Settings (Public)"])
+api_router.include_router(analytics_router, prefix="/companies/{company_id}", tags=["Analytics"])

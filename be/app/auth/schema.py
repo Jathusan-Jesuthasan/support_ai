@@ -19,6 +19,15 @@ class UserLoginRequest(BaseModel):
     password: str = Field(..., description="The user's password")
 
 
+class VerifyEmailOtpRequest(BaseModel):
+    email: EmailStr = Field(..., description="The email address to verify")
+    otp: str = Field(..., min_length=6, max_length=6, pattern=r"^\d{6}$", description="The 6-digit OTP sent to the user's email")
+
+
+class ResendOtpRequest(BaseModel):
+    email: EmailStr = Field(..., description="The email address to resend the OTP to")
+
+
 class TokenRefreshRequest(BaseModel):
     refresh_token: str = Field(..., description="The active refresh token to rotate")
 
@@ -93,3 +102,8 @@ class UserMeResponse(BaseModel):
 class VerifyEmailResponse(BaseModel):
     status: str = "success"
     message: str = "Email successfully verified. Account is now active."
+
+
+class ResendOtpResponse(BaseModel):
+    status: str = "success"
+    message: str = "A new verification code has been sent to your email."

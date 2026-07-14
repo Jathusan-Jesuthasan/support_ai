@@ -5,6 +5,11 @@ from typing import AsyncGenerator
 from httpx import AsyncClient, ASGITransport
 from app.main import app
 from app.core.database import db_manager, get_database
+from app.worker import celery_app
+
+# Enable eager mode for Celery tasks during tests
+celery_app.conf.update(task_always_eager=True, task_eager_propagates=True)
+
 
 @pytest.fixture(scope="session")
 def event_loop():
@@ -22,6 +27,8 @@ async def initialize_test_db():
     await db["users"].delete_many({})
     await db["sessions"].delete_many({})
     await db["verification_tokens"].delete_many({})
+    await db["companies"].delete_many({})
+    await db["company_members"].delete_many({})
     
     yield
     
@@ -30,6 +37,8 @@ async def initialize_test_db():
     await db["users"].delete_many({})
     await db["sessions"].delete_many({})
     await db["verification_tokens"].delete_many({})
+    await db["companies"].delete_many({})
+    await db["company_members"].delete_many({})
     db_manager.disconnect()
 
 @pytest_asyncio.fixture(loop_scope="session", autouse=True)
@@ -39,6 +48,8 @@ async def clean_collections():
     await db["users"].delete_many({})
     await db["sessions"].delete_many({})
     await db["verification_tokens"].delete_many({})
+    await db["companies"].delete_many({})
+    await db["company_members"].delete_many({})
 
 @pytest_asyncio.fixture(scope="session")
 async def client() -> AsyncGenerator[AsyncClient, None]:

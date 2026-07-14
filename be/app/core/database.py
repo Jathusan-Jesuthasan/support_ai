@@ -45,6 +45,7 @@ class DatabaseManager:
             self.db = self.client[settings.MONGODB_DB_NAME]
             self._loop = current_loop
 
+        assert self.db is not None
         return self.db
 
     async def connect(self) -> None:
@@ -103,7 +104,7 @@ class DatabaseManager:
         """
         Generates indexes, unique constraints, and TTL policies on application start.
         """
-        from pymongo import ASCENDING
+        from pymongo import ASCENDING, TEXT
         from pymongo.collation import Collation
 
         logger.info("Verifying database indexes and unique constraints...")
@@ -135,6 +136,63 @@ class DatabaseManager:
             await db["verification_tokens"].create_index([("token_hash", ASCENDING), ("purpose", ASCENDING)])
             await db["verification_tokens"].create_index("expires_at", expireAfterSeconds=0)
             logger.info("Database indexes for 'verification_tokens' collection initialized successfully.")
+
+            # 4. companies Indexes
+            await db["companies"].create_index("company_id", unique=True)
+            await db["companies"].create_index(
+                "slug",
+                unique=True,
+                collation=Collation(locale="en", strength=2)
+            )
+            logger.info("Database indexes for 'companies' collection initialized successfully.")
+
+            # 5. company_members Indexes
+            await db["company_members"].create_index("membership_id", unique=True)
+            await db["company_members"].create_index("user_id")
+            await db["company_members"].create_index("company_id")
+            await db["company_members"].create_index([("user_id", ASCENDING), ("company_id", ASCENDING)], unique=True)
+            await db["company_members"].create_index([("company_id", ASCENDING), ("role", ASCENDING)])
+            await db["company_members"].create_index([("company_id", ASCENDING), ("status", ASCENDING)])
+            logger.info("Database indexes for 'company_members' collection initialized successfully.")
+
+            # 6. knowledge Indexes
+            await db["knowledge"].create_index("knowledge_id", unique=True)
+            await db["knowledge"].create_index([("company_id", ASCENDING), ("is_deleted", ASCENDING)])
+            logger.info("Database indexes for 'knowledge' collection initialized successfully.")
+
+            # 7. documents Indexes
+            await db["documents"].create_index("document_id", unique=True)
+            await db["documents"].create_index("parent_document_id")
+            await db["documents"].create_index([("company_id", ASCENDING), ("knowledge_id", ASCENDING), ("is_deleted", ASCENDING)])
+            logger.info("Database indexes for 'documents' collection initialized successfully.")
+
+            # 8. conversations Indexes
+            await db["conversations"].create_index("conversation_id", unique=True)
+            await db["conversations"].create_index([("company_id", ASCENDING), ("user_identifier", ASCENDING)])
+            await db["conversations"].create_index([("last_message_at", ASCENDING)])
+            logger.info("Database indexes for 'conversations' collection initialized successfully.")
+
+            # 9. messages Indexes
+            await db["messages"].create_index("message_id", unique=True)
+            await db["messages"].create_index([("conversation_id", ASCENDING), ("created_at", ASCENDING)])
+            await db["messages"].create_index([("company_id", ASCENDING), ("feedback_score", ASCENDING)])
+            logger.info("Database indexes for 'messages' collection initialized successfully.")
+
+            # 10. products Indexes
+            await db["products"].create_index("product_id", unique=True)
+            await db["products"].create_index([("company_id", ASCENDING), ("sku", ASCENDING)])
+            await db["products"].create_index([("name", TEXT), ("description", TEXT)])
+            logger.info("Database indexes for 'products' collection initialized successfully.")
+
+            # 11. widget_settings Indexes
+            await db["widget_settings"].create_index("widget_id", unique=True)
+            await db["widget_settings"].create_index("company_id", unique=True)
+            logger.info("Database indexes for 'widget_settings' collection initialized successfully.")
+
+            # 12. analytics Indexes
+            await db["analytics"].create_index("event_id", unique=True)
+            await db["analytics"].create_index([("company_id", ASCENDING), ("event_type", ASCENDING), ("created_at", ASCENDING)])
+            logger.info("Database indexes for 'analytics' collection initialized successfully.")
         except Exception as e:
             logger.error(f"Error occurred while initializing database indexes: {e}")
 

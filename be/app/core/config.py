@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     PORT: int = 8000
     HOST: str = "0.0.0.0"
 
+    # CORS Allowed Origins
+    CORS_ORIGINS: list[str] = ["http://localhost:5174", "http://localhost:5173", "http://localhost:3000"]
+
     # Database Configuration
     MONGODB_URI: MongoDsn
     MONGODB_DB_NAME: str = "supportai"
@@ -43,6 +46,19 @@ class Settings(BaseSettings):
     GENERATIVE_MODEL: str = "gemini-1.5-flash"
     GENERATIVE_MODEL_PRO: str = "gemini-1.5-pro"
     CONFIDENCE_THRESHOLD: float = 0.65
+
+    # Frontend URL (used to build verification/reset links)
+    FRONTEND_URL: str = "http://localhost:5174"
+
+    # SMTP Email Configuration (optional — uses MockNotificationProvider if not set)
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = ""
+    SMTP_FROM_NAME: str = "SupportAI"
+    SMTP_USE_TLS: bool = True
+
 
 
 @lru_cache

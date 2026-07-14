@@ -114,3 +114,23 @@ class AIProvider(str, Enum):
     OPENAI = "OPENAI"
     CLAUDE = "CLAUDE"
     OLLAMA = "OLLAMA"
+
+
+class SenderType(str, Enum):
+    """
+    Message sender categories.
+    """
+    USER = "USER"
+    ASSISTANT = "ASSISTANT"
+    HUMAN_AGENT = "HUMAN_AGENT"
+
+
+class AnalyticsEventType(str, Enum):
+    """
+    Types of tracked analytics log events.
+    """
+    MESSAGE_SENT = "MESSAGE_SENT"
+    HELP_HELPFUL = "HELP_HELPFUL"
+    HELP_UNHELPFUL = "HELP_UNHELPFUL"
+    AGENT_HANDOVER = "AGENT_HANDOVER"
+

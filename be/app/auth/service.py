@@ -1,5 +1,6 @@
 import hashlib
 import logging
+import random
 import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Optional
@@ -8,7 +9,7 @@ from uuid import UUID
 from app.core.config import get_settings
 from app.core.jwt import JwtManager, jwt_manager
 from app.core.password import PasswordManager
-from app.notification.provider import NotificationProvider, MockNotificationProvider
+from app.notification.provider import NotificationProvider, MockNotificationProvider, get_notification_provider
 from app.auth.model import User, VerificationToken, Session, TokenPurpose
 from app.auth.repository import UserRepository, VerificationTokenRepository, SessionRepository
 from app.auth.schema import (
@@ -56,7 +57,7 @@ class AuthService:
         self._session_repo = session_repo or SessionRepository()
         self._password_mgr = password_mgr or PasswordManager()
         self._jwt_mgr = jwt_mgr or jwt_manager
-        self._notification_provider = notification_provider or MockNotificationProvider()
+        self._notification_provider = notification_provider or get_notification_provider()
         self._settings = get_settings()
 
     async def signup(self, request: UserSignupRequest) -> User:
@@ -94,45 +95,60 @@ class AuthService:
         )
         await self._user_repo.create(user)
 
-        # 6. Generate verification token
-        raw_token = uuid.uuid4().hex
-        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-        expires_at = now + timedelta(hours=24)
+        # 6. Generate 6-digit OTP
+        otp = f"{random.randint(0, 999999):06d}"
+        otp_hash = hashlib.sha256(otp.encode()).hexdigest()
+        expires_at = now + timedelta(minutes=10)
 
         v_token = VerificationToken(
             token_id=uuid.uuid4(),
             user_id=user.user_id,
-            token_hash=token_hash,
+            token_hash=otp_hash,
             purpose=TokenPurpose.EMAIL_VERIFICATION,
             expires_at=expires_at,
             created_at=now,
         )
         await self._token_repo.create(v_token)
 
-        # 7. Dispatch verification email
-        await self._notification_provider.send_email_verification(email, raw_token)
+        # 7. Dispatch OTP email (non-fatal — log error if SMTP fails)
+        try:
+            await self._notification_provider.send_email_otp(email, otp)
+        except Exception as email_exc:
+            logger.error(
+                f"Failed to send OTP email to {email}: {email_exc}. "
+                f"User created but email not sent. OTP: {otp}",
+                exc_info=True,
+            )
 
         return user
 
-    async def verify_email(self, raw_token: str) -> None:
+    async def verify_email_otp(self, email: str, otp: str) -> None:
         """
-        Verifies a user's email using the plaintext token string.
+        Verifies a user's email using the 6-digit OTP they entered.
         """
-        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-        token = await self._token_repo.get_by_hash(token_hash, TokenPurpose.EMAIL_VERIFICATION)
+        email = email.strip().lower()
+        user = await self._user_repo.get_by_email(email)
+        if not user:
+            raise BadRequestException("No account found for this email address")
 
-        # Validate token exists, hasn't been used, and hasn't expired
+        if user.is_email_verified:
+            raise BadRequestException("This email address is already verified")
+
+        otp_hash = hashlib.sha256(otp.encode()).hexdigest()
+        token = await self._token_repo.get_by_hash(otp_hash, TokenPurpose.EMAIL_VERIFICATION)
+
+        # Validate: token exists, belongs to user, unused, not expired
         now = datetime.now(timezone.utc)
         expires_at = _ensure_utc(token.expires_at) if token else None
-        if not token or token.used_at is not None or (expires_at is not None and expires_at < now):
-            raise BadRequestException("Invalid or expired verification token")
+        if (
+            not token
+            or token.user_id != user.user_id
+            or token.used_at is not None
+            or (expires_at is not None and expires_at < now)
+        ):
+            raise BadRequestException("Invalid or expired verification code")
 
-
-        user = await self._user_repo.get_by_id(token.user_id)
-        if not user:
-            raise BadRequestException("User associated with token not found")
-
-        # Activate user and verify email
+        # Activate user
         user.is_email_verified = True
         user.is_active = True
         user.updated_at = now
@@ -141,6 +157,44 @@ class AuthService:
         # Mark token as used
         token.used_at = now
         await self._token_repo.update(token)
+
+    async def resend_verification_otp(self, email: str) -> None:
+        """
+        Invalidates any existing OTP tokens for the user and sends a fresh 6-digit OTP.
+        """
+        email = email.strip().lower()
+        user = await self._user_repo.get_by_email(email)
+        if not user:
+            # Return silently to avoid user-enumeration attacks
+            return
+
+        if user.is_email_verified:
+            raise BadRequestException("This email address is already verified")
+
+        now = datetime.now(timezone.utc)
+
+        # Generate new OTP
+        otp = f"{random.randint(0, 999999):06d}"
+        otp_hash = hashlib.sha256(otp.encode()).hexdigest()
+        expires_at = now + timedelta(minutes=10)
+
+        v_token = VerificationToken(
+            token_id=uuid.uuid4(),
+            user_id=user.user_id,
+            token_hash=otp_hash,
+            purpose=TokenPurpose.EMAIL_VERIFICATION,
+            expires_at=expires_at,
+            created_at=now,
+        )
+        await self._token_repo.create(v_token)
+
+        try:
+            await self._notification_provider.send_email_otp(email, otp)
+        except Exception as email_exc:
+            logger.error(
+                f"Failed to resend OTP to {email}: {email_exc}. OTP: {otp}",
+                exc_info=True,
+            )
 
     async def login(self, request: UserLoginRequest, ip: Optional[str], ua: Optional[str]) -> TokenResponseData:
         """

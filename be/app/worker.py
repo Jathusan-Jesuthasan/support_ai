@@ -15,9 +15,10 @@ settings = get_settings()
 # Initialize Celery app targeting Redis as broker and backend
 celery_app = Celery(
     "supportai_worker",
-    broker=str(settings.REDIS_URL),
-    backend=str(settings.REDIS_URL),
+    broker=str(settings.REDIS_URI),
+    backend=str(settings.REDIS_URI),
 )
+
 
 # Standard production-ready task executor configurations
 celery_app.conf.update(

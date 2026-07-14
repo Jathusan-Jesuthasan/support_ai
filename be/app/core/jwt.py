@@ -102,7 +102,7 @@ class JwtManager:
                 algorithms=[self._algorithm],
                 audience=self._audience if verify_aud_iss else None,
                 issuer=self._issuer if verify_aud_iss else None,
-                options=options,
+                options=options,  # type: ignore[arg-type]
                 leeway=10,  # 10 seconds clock skew tolerance
             )
             return payload

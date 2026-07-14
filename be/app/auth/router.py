@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request, status, Query
+from fastapi import APIRouter, Depends, Request, status
 from app.auth.schema import (
     UserSignupRequest,
     UserSignupResponse,
@@ -10,6 +10,9 @@ from app.auth.schema import (
     UserLogoutResponse,
     UserMeResponse,
     VerifyEmailResponse,
+    VerifyEmailOtpRequest,
+    ResendOtpRequest,
+    ResendOtpResponse,
     UserResponseData,
 )
 from app.auth.service import AuthService
@@ -44,16 +47,28 @@ async def signup(request_payload: UserSignupRequest, service: AuthService = Depe
     )
 
 
-@router.get("/verify-email", response_model=VerifyEmailResponse, summary="Verify user email address")
-async def verify_email(
-    token: str = Query(..., description="The unique verification token sent to the user's email"),
+@router.post("/verify-email-otp", response_model=VerifyEmailResponse, summary="Verify user email with OTP")
+async def verify_email_otp(
+    request_payload: VerifyEmailOtpRequest,
     service: AuthService = Depends(get_auth_service)
 ):
     """
-    Confirms email address ownership using the verification token and activates the account.
+    Confirms email address ownership using the 6-digit OTP sent to the user's inbox.
     """
-    await service.verify_email(token)
+    await service.verify_email_otp(request_payload.email, request_payload.otp)
     return VerifyEmailResponse()
+
+
+@router.post("/resend-verification-otp", response_model=ResendOtpResponse, summary="Resend email verification OTP")
+async def resend_verification_otp(
+    request_payload: ResendOtpRequest,
+    service: AuthService = Depends(get_auth_service)
+):
+    """
+    Generates and sends a fresh 6-digit OTP to the given email address.
+    """
+    await service.resend_verification_otp(request_payload.email)
+    return ResendOtpResponse()
 
 
 @router.post("/login", response_model=UserLoginResponse, summary="Authenticate user and create session")

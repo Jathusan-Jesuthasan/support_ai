@@ -9,19 +9,36 @@ out/
 .nuxt/
 .svelte-kit/
 coverage/
+.cache/
 
 # Local environment and editor settings
 .env
-.env.*
+.env.local
+.env.*.local
 .vscode/
+.idea/
+*.swp
+*.swo
+*~
 
 # Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+lerna-debug.log*
 *.log
 
 # OS files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+desktop.ini
+
+# IDE files
+*.sublime-workspace
+*.sublime-project

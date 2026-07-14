@@ -1,0 +1,57 @@
+# =====================================================================
+# SupportAI Backend Automated Integration and Testing Workflow
+# =====================================================================
+name: SupportAI Backend CI/CD
+
+on:
+  push:
+    branches: [ "main", "development" ]
+  pull_request:
+    branches: [ "main", "development" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    # Service containers running alongside the testing workspace
+    services:
+      mongodb:
+        image: mongo:6.0
+        ports:
+          - 27017:27017
+      redis:
+        image: redis:7.0-alpine
+        ports:
+          - 6379:6379
+
+    steps:
+    - name: Checkout Source Code Repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.13 Environment
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.13"
+        cache: "pip"
+
+    - name: Install Workspace Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install ruff mypy
+
+    - name: Run Ruff Code Quality Checks
+      run: ruff check .
+
+    - name: Run Mypy Type Safety Checks
+      run: mypy .
+
+    - name: Execute Pytest Suite
+      env:
+        MONGODB_URL: mongodb://localhost:27017/supportai
+        REDIS_URL: redis://localhost:6379/0
+        CELERY_BROKER_URL: redis://localhost:6379/0
+        CELERY_RESULT_BACKEND: redis://localhost:6379/0
+        JWT_SECRET_KEY: TemporarySecuredRandomKeyForGitHubActionsTesting123!
+        GEMINI_API_KEY: AIzaSyDummyKeyForTesting
+      run: pytest -v

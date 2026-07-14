@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
+*.pyc
 
 # Virtual environments
 .venv/
@@ -19,10 +20,27 @@ htmlcov/
 
 # Local environment and editor settings
 .env
-.env.*
+.env.local
+.env.*.local
 .vscode/
+.idea/
+*.swp
+*.swo
+*~
 
 # Build artifacts
 build/
 dist/
 *.egg-info/
+.eggs/
+
+# User uploads
+uploads/
+
+# IDE
+.DS_Store
+Thumbs.db
+
+# OS files
+.DS_Store
+Thumbs.db

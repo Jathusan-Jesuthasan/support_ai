@@ -62,8 +62,8 @@ app.add_middleware(TracingMiddleware)
 # Configure Cross-Origin Resource Sharing (CORS) rules
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
